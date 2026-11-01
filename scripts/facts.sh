@@ -15,7 +15,7 @@ norm = lambda s: s.replace(",", "")
 def toks(s):
     s = norm(s)
     spans = set(re.findall(r"`[^`\n]+`", s)) | set(re.findall(r"https?://[^\s)>\]]+", s))
-    nums = set(re.findall(r"(?<![\w.])\d+(?:\.\d+)?%?", s))
+    nums = set(re.findall(r"(?<![A-Za-z0-9_.])\d+(?:\.\d+)?%?", s))
     return spans, nums
 sa, na = toks(a); sb, nb = toks(b)
 flag = 0
