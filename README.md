@@ -1,45 +1,36 @@
-# Codex × Gemini 协作循环
+# codex-gemini-loop → plain-talk
 
-让 Codex 与 Gemini 围绕同一份真实作品共同构思、修改和验证。适用于文字、方案、汇报、设计、代码与 skill 创作。
+让 agent 在回复用户之前，先把草稿交给 **没有任何上下文的 Gemini** 当"冷读者"：它用大白话重写，并指出新手会卡住的地方。agent 再核对事实没变，然后才发给用户。
 
-**对齐目标 → 创作 → Gemini 定向参与 → 核实取舍 → 修改 → 实际验证 → 交付或下一轮**。
+Before an agent sends a non-trivial result, Gemini reads the draft cold, rewrites it in plain language, and lists where a newcomer stumbles. The agent checks no fact changed, then replies.
 
-用户决定目标和边界；Codex 负责实施、事实核对、取舍和交付；Gemini 根据当前瓶颈参与共同构思、首次试读、反例检查或直接改稿。以用户目标、证据和实际工具检查判断成果是否完成。
+## 为什么用 Gemini，而不是让 agent 自己改写
 
-## 使用
+写草稿的 agent 太熟悉任务，看不出哪里难懂。Gemini 没看过任何过程，它卡住的地方就是用户会卡住的地方。同类 skill（`eli5`、`plain-english` 等）都是同一个模型自己改写，没有这个"冷读者"视角。
 
-在 Codex 中调用：
+## 用法
 
-> 请用 $codex-gemini-loop，和 Gemini 讨论着完善这个方案。先做出可审阅版本，让它检查目标读者能否理解，再核实意见、修改并验证后交付。
+```bash
+scripts/plain.sh draft.md
+scripts/plain.sh --audience "课题组PI，不写代码" --lang zh draft.md
+cat draft.md | scripts/plain.sh
+```
 
-或用于技能创作：
+输出 `REWRITE`（改写稿）和 `STUMBLES`（卡点清单）。脚本还会对草稿里的反引号代码、路径、数字做检查，改写稿里丢了的会在 stderr 打印 `WARN`。Gemini 不可用时退出码为 3，agent 自己改写即可，不阻塞回复。
 
-> 用 $codex-gemini-loop 设计并实现一个新 skill。让 Gemini 参与结构设计、阅读实际初稿并提出具体修改；由你核实取舍、修改、校验后提交。
-
-已认可的内容作为本轮基线，局部修改保留范围；实质问题解决后收敛，小修改不强制重复整套流程。
-
-写作和界面文案默认执行**去保守化**：先给判断与行动，删掉惯性降调、重复免责和回避结论的表达。Gemini 的审阅也按这一目标进行；事实、来源推荐强度与必要适用条件保持准确。
+完整流程见 [SKILL.md](SKILL.md)，给 Gemini 的提示词见 [references/editor-prompt.md](references/editor-prompt.md)。
 
 ## 安装
 
-可让 Codex 的 skill installer 安装本仓库根目录：
-
-> 请安装 https://github.com/Biogod2020/codex-gemini-loop 这个 skill。
-
-手动安装到尚未存在的技能目录：
-
 ```bash
-git clone https://github.com/Biogod2020/codex-gemini-loop.git \
-  "${CODEX_HOME:-$HOME/.codex}/skills/codex-gemini-loop"
+# Claude Code
+git clone https://github.com/Biogod2020/codex-gemini-loop ~/.claude/skills/codex-gemini-loop
+# Codex
+git clone https://github.com/Biogod2020/codex-gemini-loop ~/.codex/skills/codex-gemini-loop
 ```
 
-Gemini 调用使用宿主环境已有的工具或客户端，连接与认证由宿主环境配置。默认模型偏好是 Gemini 3.8 Flash high，当前用户指定优先；每次调用及结果按实际记录。
+需要已安装并登录的 Gemini CLI。可选环境变量：`GEMINI_BIN`、`GEMINI_MODEL`、`GEMINI_FALLBACK_MODELS`、`GEMINI_TIMEOUT`。
 
-## 文件
+## 隐私
 
-- [SKILL.md](SKILL.md)：完整循环、角色分工、取舍和结束条件。
-- [交接提示](references/handoff-prompts.md)：共同构思、试读、改写、挑战和改后复核的提示模板。
-- [实际创建示例](references/skill-creation-example.md)：本 skill 的三次真实协作交接，以及采纳和未采纳意见的理由。
-- [agents/openai.yaml](agents/openai.yaml)：Codex 界面元信息。
-
-这套方法提炼自一次研究图的持续协作，随后抽象成通用工作循环。这个 skill 也按同一循环完成：Gemini 参与共同设计、初稿审阅和修订复核，Codex 核实取舍并完成文档校验。
+草稿会发给 Gemini。发送前去掉密钥、令牌和个人信息。

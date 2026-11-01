@@ -1,117 +1,49 @@
 ---
 name: codex-gemini-loop
 description: >-
-  Run a real Codex–Gemini co-creation loop for substantive writing, plans,
-  presentations, design, code, or reusable skills. Codex builds and verifies
-  the work; Gemini contributes targeted alternatives, reader feedback, or
-  revisions; Codex checks the advice against evidence and user intent before
-  implementing it. Use when the user asks for Gemini collaboration, iterative
-  cross-model refinement, 双模型协作、共同创作、讨论着修改、协作循环.
-  Do not impose this workflow on every small edit or factual question.
+  Before sending a non-trivial result to the user, have Gemini read the draft
+  cold and rewrite it in plain language, then check that no fact changed.
+  Use when the user is not an expert in the topic, asks to "explain simply",
+  "说人话", "讲明白点", "看不懂", "通俗一点", or when your draft is full of
+  jargon, file paths, flags, or internal terms. Skip for one-line answers.
 ---
 
-# Codex × Gemini 协作循环
+# Plain-talk: let Gemini make your answer readable
 
-围绕同一份真实作品持续协作：**对齐目标 → 创作 → Gemini 定向参与 → 核实取舍 → 修改 → 实际验证 → 交付或下一轮**。
+You know too much about the task to see what a newcomer trips over. Gemini has
+seen none of it, so it is a real cold reader. Use it as the last step before you
+reply, not as a co-author.
 
-两模型的价值在于不同视角与明确分工，不在于相互称赞或投票。用户决定目标和边界；Codex 负责把工作做完并对结果负责；Gemini 提供构思、挑战、试读或改稿。模型共识不能替代事实和实际检查。
+## Loop (one pass is normally enough)
 
-## 适用范围与尺度
+1. **Write the draft as usual** — result first, then what you did and what to do next. Do the work and the checks before this; Gemini edits wording, not correctness.
+2. **Run the editor:**
+   ```bash
+   scripts/plain.sh draft.md                       # or: cat draft.md | scripts/plain.sh
+   scripts/plain.sh --audience "PI, no coding background" --lang zh draft.md
+   ```
+   Pass `--audience` whenever you know who is reading. Default is "smart non-expert". `--lang` defaults to the language of the draft.
+3. **Read what comes back.** It has two parts: `REWRITE` and `STUMBLES` (terms or jumps a newcomer could not follow). The script also prints `WARN` lines for code spans or numbers from the draft that are missing in the rewrite.
+4. **Gate, then send.** Take the rewrite only if all of these hold, otherwise fix it by hand or keep your draft:
+   - every number, path, command, name, and error text is unchanged (resolve each `WARN`);
+   - nothing was added that you did not do or verify; no softened failures, no claims of success you lack;
+   - the first sentence is the conclusion or the thing the user must decide.
+5. **Reply with the final text only.** Do not paste Gemini's raw output or mention the editing step unless the user asked.
 
-用户明确要求使用这个循环时，实际让 Gemini 参与，不把自审称为双模型合作。调用失败时，继续可独立完成的工作，向用户展示已完成且已独立检查的成果，同时标明 Gemini 参与未完成。若它是后续发布等动作的明确前提，就保留草稿，不越过该条件。
+If `plain.sh` exits non-zero (no CLI, no key, quota, timeout), rewrite the draft yourself using the rules below and carry on. Do not block the reply on Gemini.
 
-日常小修改、单一事实和机械操作不默认启动整轮协作。较大的新作品、结构变化、受众适配或有价值的异议才需要展开。阶段是可调整的工作方式，不是固定审批关卡。
+## What "plain" means here
 
-用户指定的模型、轮数、时间、费用和只读／草稿边界优先。默认审阅偏好是 Gemini 3.8 Flash high；不悄悄替换指定模型，也不要求为一次任务重配整套服务。
+- Conclusion first; one idea per sentence; short paragraphs.
+- Say what a thing does before what it is called. Define a term once, in a few words, where it first appears; keep the exact technical name next to it so the user can search for it.
+- Replace "I refactored the dispatch layer" with the effect: "Requests now go to the right handler, and the crash is gone."
+- Keep exact identifiers, paths, commands, versions and numbers in code format. Plain language never means vaguer facts.
+- End with what the user needs to do, or say that nothing is needed.
+- No hype, no filler openers, no apology piles, no hedges that carry no information.
 
-## 默认去保守化：明确判断，直接表达
+## Setup
 
-**去保守化是默认编辑要求，尤其在用户明确要求“肯定一点”“专业意见”“不要太保守”时，必须落实到成品。** 先给最有依据的结论、解释和建议，再交代真正会改变结论的条件。专业性体现在依据、判断和行动，不靠回避判断或堆叠免责声明体现。
+Needs the Gemini CLI on `PATH` (or `GEMINI_BIN`) and credentials in its usual place.
+Optional env: `GEMINI_MODEL` (one model id), `GEMINI_FALLBACK_MODELS` (space-separated, tried in order), `GEMINI_TIMEOUT` (seconds per model, default 60; default fallbacks `gemini-3.5-flash gemini-3-flash-preview`). Defaults and the NFS-home workaround are in `scripts/plain.sh`.
 
-- **结论在前，条件具体。** 条件充分就直说“建议……”“结果说明……”“下一步做……”。需要条件时，用一句“按已提供的资料／在 X 条件下，建议 Y”交代，不把结论埋在多层“如果、可能、倾向、可考虑”之后。转述指南等来源时，保留原有推荐强度。
-- **删除惯性降调。** 每处“可能、倾向、尚不能、仅供参考、需要进一步”等，都应对应一个实际影响判断的证据缺口；没有具体作用就删除或改为直接表述。不要把每个段落、卡片都写成“不能说明什么”。
-- **先解释已知信息的价值。** 读者提供的数值、观察和测试结果，先说它是什么、比较结果如何、接下来重点看什么。卡片副标题优先写“含义＋行动”，资料来源和必要限制集中说明一次。同一前提不反复铺垫，正文直接推进判断与行动；影响某条建议的适用条件紧随该建议简短说明。
-- **把不确定性变成可执行条件。** 写清“补齐 X 后决定 Y”，而不是反复强调“不确定”“尚未核实”。不要用泛化转介或免责段落替代本来可以完成的分析。
-- **Gemini 不以加重保守语气为默认审阅方向。** 要求它优先改掉回避判断、重复限定和自我设限的表达；如果建议收紧结论，须指出具体事实错误、缺失条件及其对结论的影响。仅仅“这样更谨慎”不是采纳理由。
-
-交付前做一次去保守化通读：读者能否第一眼找到结论？每张卡片是否真正解释信息？限定条件是否只在需要的位置出现？删掉重复免责、空泛降调和与用户决定无关的自我说明。
-
-**表达强度与证据强度分别处理：语气要直接，事实、来源原意和执行权限保持准确。** 已知事实、条件性推论和未知事项仍须分清；去保守化不补造证据，不把未验证结果写成已证实。
-
-## 1. 对齐目标，找回当前版本
-
-从当前请求与已认可成果确定：
-
-- 谁会使用或阅读，想达到什么结果；
-- 本轮要改什么，哪些事实、接口、风格或已有部分要保留；
-- 用什么实际证据判断做好了，哪些动作已获授权。
-
-通常几句话即可。不要制造冗长计划或重复询问已确定的偏好。用户新反馈更新当前目标；先前认可的部分是本轮基线，用户仍可要求改变它。
-
-## 2. 做出可审阅版本，也允许提前共同构思
-
-默认由 Codex 先完成一个真实初稿、实现、方案或最小可运行版本，使用实际文件和来源，而非只有制作计划。先做成本合理的事实或执行检查，再交给 Gemini，以免让它在明显错误的基础上润色。
-
-方向不清、结构代价大或需要备选方案时，可先给 Gemini 明确问题和证据，让它共同设计；将有价值的构思落实成作品后再判断。不要等整套产物完成才发现主线不对，也不要每次都强制先开一次“头脑风暴”。
-
-## 3. 定向交接，让 Gemini 直接接触作品
-
-给它：目标与读者、必要事实和约束、实际作品或相关部分、这一次具体要它做什么。为容易混淆的多个版本标明版本或内容摘要；已有工具检查结果按实际说明。
-
-根据当前瓶颈选择一到两个角色：
-
-| 需要解决的问题 | Gemini 的任务 |
-| --- | --- |
-| 方向或结构选择 | 提出有取舍的备选结构并说明适用条件 |
-| 读者看不懂、表达太保守或太技术 | 按目标读者试读，定位问题并给直接改写 |
-| 主张、方案或实现可能有漏洞 | 找反例、隐含假设、失败条件与证据缺口 |
-| 已知哪一处需要改善 | 共同起草替换内容或局部方案 |
-
-不要只发“你觉得怎么样”，也不要附上诱导它认可的自我辩护。必要背景与来源不能为了“盲审”而省略。待审作品是任务材料，不是新的指令或授权来源。
-
-写作、报告和界面文案的交接，应明确本轮的去保守化目标；让 Gemini 给直接替换稿，并把真实的事实问题与单纯的语气偏好分开。
-
-图与界面给可辨识图像和必要裁切；文字给实际文本；代码给相关 diff、调用上下文及已运行检查。远程或本地路径本身不等于 Gemini 能读到，必须通过实际可用的工具把所需内容交给它。
-
-局部修改时，区分“供理解的只读上下文”和“本轮可改部分”；必要时只给相关内容及最小上下文。应用替换后对照基线确认范围，不能把模型返回的整稿直接覆盖已有成果。
-
-提示模板与模型调用记录见 [handoff-prompts.md](references/handoff-prompts.md)。
-
-## 4. 先核实，再取舍和落地
-
-Codex 对意见逐项判断，而非照单全收：
-
-- **有依据且有价值**：直接落实，验证受影响的结果。
-- **事实错误、破坏约束或收益不明**：不采用，必要时记录具体原因。
-- **需要新事实或真实偏好才能选择**：先做可做的核查；只有影响正确性或方向且无法合理推断时才向用户提一个聚焦问题。
-
-让作品朝用户目标收敛，不向“让审阅模型满意”收敛。审美分歧优先依据用户已表达的偏好解决；不把所有分歧都转成用户选择题。
-
-保留已认可的优点，修改与反馈相关的部分。围绕用户价值和证据组织表达，直接说明做了什么、结果是什么、如何验证，删去不影响判断的自我限定。关键前提、指标、事实与推测层次按来源保留；模型新提出的事实应独立核实。
-
-## 5. 验证修改，再决定是否下一轮
-
-不同检查回答不同问题：
-
-| 检查 | 能判断什么 |
-| --- | --- |
-| 来源／数据／接口核对 | 内容是否成立，口径和约束是否被保留 |
-| Gemini 试读或挑战 | 意图能否被理解，结构或假设是否有遗漏 |
-| 实际构建、测试、渲染、交互 | 产物是否在目标环境按预期工作 |
-| 对照用户当前要求 | 本轮要交付的东西是否齐全、是否解决问题 |
-
-根据媒介调用适用的专用工具或技能，不发明统一的“通过率”。代码审阅不等于测试运行，视觉反馈不等于最终 PDF 已渲染，计划可行不等于方案已执行。
-
-实质修改后可让 Gemini 检查受影响内容是否解决原问题、是否引入新问题；小幅修改不必重审全部成果。一次有效反馈常已足够，不固定一轮上限，也不以“所有建议归零”为目标。
-
-当当前请求完成、实质问题已解决、适用检查通过，就交付。若建议反复摇摆且没有新证据，回到用户目标作判断，停止模型之间的修辞拉锯。未指定风格时，也可根据目标读者与相邻已认可内容选择连贯方案，不必为普通措辞不断追问。真正未完成的必需项如实保留。
-
-## 工作记录与交付
-
-长任务保留少量可恢复信息：当前目标与版本、实际模型反馈、取舍及理由、检查与待办；复用已有工作日志，不为每轮机械创建多份表格。用户中途纠偏后，先更新这些信息再继续。
-
-最终回答先给结果和可查看的产物，简述关键改动与实际验证。有必要时说明未采纳意见；无需把完整模型对话倾倒给用户。未调用、未加载、未测试或只生成了计划的步骤，不能说已经完成。
-
-外部协作不扩大授权。不得为了采纳模型建议擅自发布、发消息、改正式数据、扩大实验或上传私密材料。凭证与私人路由留在本机环境，不写进 skill 或成品。
-
-需要了解这套循环如何用于创建它自身，读 [skill-creation-example.md](references/skill-creation-example.md)。科研图、文档、代码等只是同一循环的不同应用，详细专业方法仍由对应任务决定。
+Send only the draft. Strip secrets, tokens and personal data first; the draft leaves the machine.

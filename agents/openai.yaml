@@ -1,4 +1,4 @@
 interface:
-  display_name: "Codex × Gemini 协作循环"
-  short_description: "让 Codex 执行、Gemini 构思与审阅，核实反馈后迭代并验证交付"
-  default_prompt: "请用 $codex-gemini-loop 完成这项工作：先产出可审阅版本，让 Gemini 按目标受众参与构思或复核，再核实意见、修改并实际验证后交付。"
+  display_name: "Plain-talk（Gemini 冷读改写）"
+  short_description: "回复前让 Gemini 当冷读者，把结果改成用户看得懂的大白话"
+  default_prompt: "用 $codex-gemini-loop：先写好回复草稿，交给 Gemini 冷读并改写成大白话，核对数字、路径和命令没变后再发给我。"
