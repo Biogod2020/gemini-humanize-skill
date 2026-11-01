@@ -1,4 +1,4 @@
 interface:
-  display_name: "Plain-talk（Gemini 冷读改写）"
-  short_description: "回复前让 Gemini 当冷读者，把结果改成用户看得懂的大白话"
-  default_prompt: "用 $codex-gemini-loop：先写好回复草稿，交给 Gemini 冷读并改写成大白话，核对数字、路径和命令没变后再发给我。"
+  display_name: "Gemini 局外人审阅"
+  short_description: "看不懂时让 Gemini 冷读；重要产物让 Gemini 角色审，核实后才采纳"
+  default_prompt: "用 $gemini-humanize-skill：先自己做完，再让 Gemini 当冷读者或评审给意见，逐条核实后采纳。"

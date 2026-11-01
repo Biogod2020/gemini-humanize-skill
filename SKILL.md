@@ -1,49 +1,74 @@
 ---
-name: codex-gemini-loop
+name: gemini-humanize-skill
 description: >-
-  Before sending a non-trivial result to the user, have Gemini read the draft
-  cold and rewrite it in plain language, then check that no fact changed.
-  Use when the user is not an expert in the topic, asks to "explain simply",
-  "说人话", "讲明白点", "看不懂", "通俗一点", or when your draft is full of
-  jargon, file paths, flags, or internal terms. Skip for one-line answers.
+  让 Gemini 当"局外人"审你的产出：用户看不懂你的技术回复时做冷读，重要产物（论文、图、
+  方案、对外文案）交付前做角色审稿，高把握的诊断和决策找盲点。Gemini 只给意见，你核实后
+  才采纳，不让它直接改正文。触发：用户说"看不懂""说人话""讲明白点""通俗一点"，或要求
+  Gemini 审阅/角色扮演；或产物要给外部读者评判、返工代价高、又无法直接跑检查验证。
+  日常回复、小改动、代码步骤、可直接验证的事实不要用。
 ---
 
-# Plain-talk: let Gemini make your answer readable
+# Gemini 局外人审阅
 
-You know too much about the task to see what a newcomer trips over. Gemini has
-seen none of it, so it is a real cold reader. Use it as the last step before you
-reply, not as a co-author.
+你写，Gemini 当没有上下文的另一双眼睛挑毛病，你逐条核实后再采纳。Gemini 不改正文：它会加强调词、编数字、悄悄改含义。
 
-## Loop (one pass is normally enough)
+## 什么时候用
 
-1. **Write the draft as usual** — result first, then what you did and what to do next. Do the work and the checks before this; Gemini edits wording, not correctness.
-2. **Run the editor:**
-   ```bash
-   scripts/plain.sh draft.md                       # or: cat draft.md | scripts/plain.sh
-   scripts/plain.sh --audience "PI, no coding background" --lang zh draft.md
-   ```
-   Pass `--audience` whenever you know who is reading. Default is "smart non-expert". `--lang` defaults to the language of the draft.
-3. **Read what comes back.** It has two parts: `REWRITE` and `STUMBLES` (terms or jumps a newcomer could not follow). The script also prints `WARN` lines for code spans or numbers from the draft that are missing in the rewrite.
-4. **Gate, then send.** Take the rewrite only if all of these hold, otherwise fix it by hand or keep your draft:
-   - every number, path, command, name, and error text is unchanged (resolve each `WARN`);
-   - nothing was added that you did not do or verify; no softened failures, no claims of success you lack;
-   - the first sentence is the conclusion or the thing the user must decide.
-5. **Reply with the final text only.** Do not paste Gemini's raw output or mention the editing step unless the user asked.
+三个问题都答"是"才值得：
+1. 有别人要评判或使用这份产出吗（投稿、导师、合作者、对外发布、重要邮件）？
+2. 错了返工贵或收不回来吗（骨架定错、删数据、迁移、长训练前的方案）？
+3. 我无法直接验证吗？能跑测试、查文档、对数字的，直接做，不找 Gemini。
 
-If `plain.sh` exits non-zero (no CLI, no key, quota, timeout), rewrite the draft yourself using the rules below and carry on. Do not block the reply on Gemini.
+另有一个独立触发：**用户说看不懂**，或你的回复里生词很密（用户的领域之外的工程黑话）。此时走下面的"看不懂"流程，不必答三个问题。
 
-## What "plain" means here
+## 角色
 
-- Conclusion first; one idea per sentence; short paragraphs.
-- Say what a thing does before what it is called. Define a term once, in a few words, where it first appears; keep the exact technical name next to it so the user can search for it.
-- Replace "I refactored the dispatch layer" with the effect: "Requests now go to the right handler, and the crash is gone."
-- Keep exact identifiers, paths, commands, versions and numbers in code format. Plain language never means vaguer facts.
-- End with what the user needs to do, or say that nothing is needed.
-- No hype, no filler openers, no apology piles, no hedges that carry no information.
+`scripts/review.sh ROLE [选项] 材料文件`，角色定义在 `roles/`：
 
-## Setup
+| 角色 | 用在 | 要点 |
+| --- | --- | --- |
+| `reader` 冷读者 | 用户可能看不懂的说明、汇报、README | 先复述它读懂了什么，再列卡点。复述和你的本意对不上，就是写得不清楚 |
+| `challenger` 挑错者 | 根因诊断、"已修好"、实验解读、方案、不可逆操作 | 列出未证实的假设、替代解释、最便宜的验证 |
+| `judge` 评审 | 论文、骨架、图、幻灯片、对外文案 | `--persona` 换成编辑、苛刻审稿人、领域专家、评委、普通观众；图用 `--attach` |
+| `meaning` 含义对比 | 你改写或润色之后 | `--against 原文`，只找含义被改的地方 |
 
-Needs the Gemini CLI on `PATH` (or `GEMINI_BIN`) and credentials in its usual place.
-Optional env: `GEMINI_MODEL` (one model id), `GEMINI_FALLBACK_MODELS` (space-separated, tried in order), `GEMINI_TIMEOUT` (seconds per model, default 60; default fallbacks `gemini-3.5-flash gemini-3-flash-preview`). Defaults and the NFS-home workaround are in `scripts/plain.sh`.
+常用选项：`--persona`（Gemini 扮演谁，写具体）、`--goal`（材料给谁看、要达到什么）、`--ref`（范文）、`--max`（意见条数，默认 8）。
 
-Send only the draft. Strip secrets, tokens and personal data first; the draft leaves the machine.
+## 流程
+
+1. **自己先做完并验证。** Gemini 审的是表达和判断，不替你查对错。
+2. **选角色，写清 `--persona` 和 `--goal`。** 一次一到两个角色，不要全开。重要产物可以多个 persona 各跑一次。
+3. **核实每条意见。** Gemini 的修改建议常常夹带它编的事实（例如凭空补一句"该开销只发生一次"）。逐条归入：
+   - **采纳**：有依据，改并验证；
+   - **核实后不成立**：事实上不对，记下原因；
+   - **未采纳**：属于 `[taste]` 或与用户已表达的偏好冲突。
+   `[fact]` 标签的意见也要自己确认，Gemini 会标错。
+4. **改完后** 改动较大时用 `meaning` 角色加 `scripts/facts.sh 原文 新文` 复核：数字、路径、命令、代码片段是否原样保留，有没有多出强调词。
+5. **收敛即交付。** 实质问题解决就停，通常一到两轮；不追求"零意见"。长任务把意见与取舍留档（格式见 [references/ledger.md](references/ledger.md)）。
+
+## 用户说"看不懂"
+
+1. 找出卡点：不是整段重来，先想哪些词、哪一步跳了。用户是生信研究者，生信概念可以直接用；fork、CUDA、分布式通信这类工程词要解释，最好拿用户领域的东西类比。
+2. 你自己重写，结构固定：**一句话结论 → 一个类比或具体例子 → 你需要做什么**。术语保留原名并在旁边用几个字说明，方便搜索。数字、路径、命令原样保留。
+3. `review.sh reader --persona "<用户的背景>" --goal "<要让他做什么决定>" 草稿`，看它的复述是否对上你的本意，补它列出的卡点。
+4. `facts.sh 原稿 重写稿` 过一遍，再发。回复里不提这一步。
+
+## 不要做
+
+- 不让 Gemini 直接重写正文或回复，也不把它的原文转发给用户。
+- 不用 Gemini 的赞同代替验证、测试和查证。
+- 不替用户做授权决定：外发、删除、花钱的动作照常先问。
+- 不把密钥、令牌、个人信息写进发给 Gemini 的材料；材料会离开本机。
+- Gemini 不可用（脚本退出码 3）时，继续独立完成并如实说明没有经过 Gemini，不拿自审冒充。
+
+## 配置
+
+`scripts/gemini_call.sh` 优先走 `GEMINI_PROXY_URL` 指向的 Gemini 原生接口（如本机 CLIProxyAPI），支持图片和 PDF 附件；否则退回 `gemini` 命令行（只支持文字）。设置写在 `~/.config/gemini-humanize.env`（`KEY=VALUE`，只放地址和密钥文件路径，不放密钥本身）：
+
+```
+GEMINI_PROXY_URL=http://127.0.0.1:8317
+GEMINI_PROXY_KEY_FILE=/path/to/key_file
+GEMINI_MODEL=gemini-3.8-flash-high
+```
+
+用户指定了模型就用指定的，不要悄悄换。
