@@ -1,4 +1,4 @@
 interface:
   display_name: "Gemini 局外人审阅"
-  short_description: "看不懂时让 Gemini 冷读；重要产物让 Gemini 角色审，核实后才采纳"
-  default_prompt: "用 $gemini-humanize-skill：先自己做完，再让 Gemini 当冷读者或评审给意见，逐条核实后采纳。"
+  short_description: "重要产物让 Gemini 当评审或挑错者，核实后才采纳；看不懂时按规则说人话"
+  default_prompt: "用 $gemini-humanize-skill：先自己做完，再让 Gemini 当评审或挑错者给意见，逐条核实后采纳。"

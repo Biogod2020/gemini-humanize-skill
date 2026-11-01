@@ -16,4 +16,6 @@ t comma-number-same     '共 3,862 个' '共 3862 个' 0 ''
 t number-added          '耗时 12 秒' '耗时 12 秒,共 30 个' 1 'only in revised: 30'
 t intensifier-added     '耗时降低了' '耗时显著降低了' 1 'intensifier only in revised: 显著'
 t unchanged             '已修复 `a.py`,耗时 412s 降到 138s(-66.5%)。' '`a.py` 已修好。耗时从 412s 降到 138s(-66.5%)。' 0 ''
+t list-ordinals-ignored  $'要点:\n1. 重启服务\n2. 检查日志' $'- 重启服务\n- 检查日志' 0 ''
+t list-ordinal-real-num $'1. 耗时 12 秒' $'耗时很短' 1 'missing in revised: 12'
 exit $fail

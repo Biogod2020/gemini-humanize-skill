@@ -13,7 +13,7 @@ import re, sys
 a, b = (open(p, encoding="utf-8").read() for p in sys.argv[1:3])
 norm = lambda s: s.replace(",", "")
 def toks(s):
-    s = norm(s)
+    s = re.sub(r"(?m)^\s*(?:[-*]\s+)?\(?\d{1,2}[.)、]\s*", "", norm(s))   # drop list ordinals ("1.", "2)")
     spans = set(re.findall(r"`[^`\n]+`", s)) | set(re.findall(r"https?://[^\s)>\]]+", s))
     nums = set(re.findall(r"(?<![A-Za-z0-9_.])\d+(?:\.\d+)?%?", s))
     return spans, nums
